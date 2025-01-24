@@ -1,0 +1,193 @@
+import json
+import os
+from datetime import datetime
+
+# 文件路径
+SAVE_PATH = "game_schedule.json"
+LOG_PATH = "daily_log.txt"
+
+# 初始化角色数据
+DEFAULT_DATA = {
+    "character": {
+        "name": "username",
+        "level": 1,
+        "exp": 0,
+        "hp": 5
+    },
+    "tasks": {
+        "main": [],
+        "side": []
+    }
+}
+
+# 读取数据
+def load_data():
+    if os.path.exists(SAVE_PATH):
+        with open(SAVE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    else:
+        return DEFAULT_DATA
+
+# 保存数据
+def save_data(data):
+    with open(SAVE_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# 显示角色状态
+def show_status(data):
+    char = data["character"]
+    print("\n===== 当前角色状态 =====")
+    print(f"角色名: {char['name']}")
+    print(f"等级: {char['level']}")
+    print(f"经验值: {char['exp']}")
+    print(f"生命值: {'🧡' * char['hp']}")
+    print("========================")
+
+# 添加任务
+def add_task(data, task_type):
+    task_name = input(f"请输入{'主线' if task_type == 'main' else '支线'}任务名称: ")
+    reward = int(input("请输入任务奖励的经验值 (EXP): "))
+    data["tasks"][task_type].append({"name": task_name, "reward": reward, "completed": False})
+    print(f"任务 '{task_name}' 已添加！")
+
+# 显示任务列表
+def show_tasks(data):
+    print("\n===== 今日任务 =====")
+    for task_type, task_list in data["tasks"].items():
+        print(f"{'主线任务' if task_type == 'main' else '支线任务'}:")
+        for i, task in enumerate(task_list, 1):
+            status = "✅" if task["completed"] else "❌"
+            print(f"  {i}. {task['name']} (奖励: {task['reward']} EXP) 状态: {status}")
+    print("====================")
+
+# 完成任务
+def complete_task(data):
+    show_tasks(data)
+    task_type = input("请选择任务类型 (main/side): ")
+    task_index = int(input("请选择完成的任务编号: ")) - 1
+    if 0 <= task_index < len(data["tasks"][task_type]):
+        task = data["tasks"][task_type][task_index]
+        if not task["completed"]:
+            task["completed"] = True
+            data["character"]["exp"] += task["reward"]
+            print(f"任务 '{task['name']}' 完成！获得 {task['reward']} EXP！")
+            # 检查是否升级
+            check_level_up(data)
+        else:
+            print("该任务已完成！")
+    else:
+        print("任务编号无效！")
+
+# 检查角色是否升级
+def check_level_up(data):
+    char = data["character"]
+    while char["exp"] >= char["level"] * 10:  # 升级所需经验值 = 当前等级 * 10
+        char["exp"] -= char["level"] * 10
+        char["level"] += 1
+        char["hp"] = min(char["hp"] + 1, 5)  # 每次升级恢复 1 点生命值，最大值为 5
+        print(f"恭喜！{char['name']} 升级到等级 {char['level']}！生命值恢复 1 点！")
+
+# 修改角色名
+def change_character_name(data):
+    new_name = input("请输入新的角色名: ")
+    data["character"]["name"] = new_name
+    print(f"角色名已修改为: {new_name}")
+
+# 保存每日日志
+def save_daily_log(data):
+    # 设置 Obsidian Vault 的路径
+    obsidian_vault_path = "/storage/emulated/0/Documents/高考HUD日志/"  # 替换为你的 Obsidian Vault 路径
+
+    # 确保文件夹存在
+    if not os.path.exists(obsidian_vault_path):
+        os.makedirs(obsidian_vault_path)
+
+    # 获取当前日期
+    today = datetime.now().strftime('%Y-%m-%d')
+    file_name = f"高考HUD日志{today}.md"  # 日志文件名
+    file_path = os.path.join(obsidian_vault_path, file_name)
+
+    # 将任务和角色状态写入 Markdown 格式
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(f"# {today} 学习日志\n\n")
+
+        for task_type, task_list in data["tasks"].items():
+            f.write(f"## {'主线任务' if task_type == 'main' else '支线任务'}\n")
+            for task in task_list:
+                status = "完成" if task["completed"] else "未完成"
+                f.write(f"- **{task['name']}** - 状态: {status} (奖励: {task['reward']} EXP)\n")
+
+        char = data["character"]
+        f.write(f"\n### 角色状态\n")
+        f.write(f"等级: {char['level']}, 经验值: {char['exp']}, 生命值: {'🧡' * char['hp']}\n")
+
+    print(f"日志已保存为 {file_path}")
+
+# 确认退出
+def confirm_exit():
+    choice = input("您确定要退出吗? (y/n): ")
+    if choice.lower() == "y":
+        print("程序退出！")
+        return True
+    else:
+        print("取消退出，继续执行！")
+        return False
+
+# 确认是否执行操作
+def confirm_action(action_name):
+    choice = input(f"您确定要执行'{action_name}'操作吗? (y/n): ")
+    if choice.lower() == "y":
+        return True
+    else:
+        print(f"'{action_name}' 操作已取消！")
+        return False
+
+# 主菜单
+def main():
+    data = load_data()
+    while True:
+        print("\n===== 高考HUD =====")
+        print("1. 查看角色状态")
+        print("2. 添加主线任务")
+        print("3. 添加支线任务")
+        print("4. 查看任务列表")
+        print("5. 完成任务")
+        print("6. 修改角色名")
+        print("7. 保存每日日志并退出")
+        print("8. 退出程序")
+        choice = input("请选择功能: ")
+
+        if choice == "1":
+            if confirm_action("查看角色状态"):
+                show_status(data)
+        elif choice == "2":
+            if confirm_action("添加主线任务"):
+                add_task(data, "main")
+        elif choice == "3":
+            if confirm_action("添加支线任务"):
+                add_task(data, "side")
+        elif choice == "4":
+            if confirm_action("查看任务列表"):
+                show_tasks(data)
+        elif choice == "5":
+            if confirm_action("完成任务"):
+                complete_task(data)
+        elif choice == "6":
+            if confirm_action("修改角色名"):
+                change_character_name(data)
+        elif choice == "7":
+            if confirm_action("保存每日日志并退出"):
+                save_daily_log(data)
+                save_data(data)
+                print("进度已保存，退出程序！")
+                break
+        elif choice == "8":
+            if confirm_action("退出程序"):
+                break
+        else:
+            print("无效选项，请重新选择！")
+
+if __name__ == "__main__":
+    main()
+
+
